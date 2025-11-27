@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  postgres-categorias:
+    image: postgres:15-alpine
+    container_name: postgres-categorias
+    environment:
+      POSTGRES_DB: categorias_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-categorias-data:/var/lib/postgresql/data
+    networks:
+      - cardapio-network
+
+  postgres-pratos:
+    image: postgres:15-alpine
+    container_name: postgres-pratos
+    environment:
+      POSTGRES_DB: pratos_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-pratos-data:/var/lib/postgresql/data
+    networks:
+      - cardapio-network
+
+  servico-categorias:
+    build:
+      context: ./servico-categorias
+      dockerfile: Dockerfile
+    container_name: servico-categorias
+    ports:
+      - "8080:8080"
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres-categorias:5432/categorias_db
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      - postgres-categorias
+    networks:
+      - cardapio-network
+
+  servico-pratos:
+    build:
+      context: ./servico-pratos
+      dockerfile: Dockerfile
+    container_name: servico-pratos
+    ports:
+      - "8081:8080"
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres-pratos:5432/pratos_db
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+      SERVICO_CATEGORIAS_URL: http://servico-categorias:8080
+    depends_on:
+      - postgres-pratos
+      - servico-categorias
+    networks:
+      - cardapio-network
+
+  frontend:
+    image: nginx:alpine
+    container_name: frontend-cardapio
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - servico-categorias
+      - servico-pratos
+    networks:
+      - cardapio-network
+
+volumes:
+  postgres-categorias-data:
+  postgres-pratos-data:
+
+networks:
+  cardapio-network:
+    driver: bridge
